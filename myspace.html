@@ -47,7 +47,7 @@
     
   </section>
   
-  <ul id="friendsList"></ul>
+  
 </section>
     </main>
 
@@ -74,6 +74,7 @@
           console.error('Error fetching user:', error);
           return null;
         }
+        console.log('fetchUserProfile() - user data:', data);  // Log user profile data
 
         // Update profile picture on page if available
         if (data.profile_picture_url) {
@@ -87,70 +88,83 @@
       const friendsListEl = document.getElementById("friendsList");
 
   async function loadFriends(userId) {
-        const friendsListEl = document.getElementById("friendsList");
+    console.log('Loading friends for userId:', userId);
 
-        // Fetch friend relationships where userId is user_id or friend_id
-        const { data: friendsData, error: friendsError } = await supabase
-          .from('friends')
-          .select('user_id, friend_id')
-          .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+    
 
-        if (friendsError) {
-          console.error('Error fetching friends:', friendsError);
-          friendsListEl.textContent = 'Failed to load friends.';
-          return;
-        }
+  const friendsListEl = document.getElementById("friendsList");
 
-        if (!friendsData || friendsData.length === 0) {
-          friendsListEl.textContent = 'No friends found.';
-          return;
-        }
-
-        // Determine friend IDs (exclude self)
-        const friendIds = friendsData.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
-
-        // Fetch friend profiles
-        const { data: friendProfiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('user_id, profile_picture_url, display_name')
-          .in('user_id', friendIds);
-
-        if (profilesError) {
-          console.error('Error fetching friend profiles:', profilesError);
-          friendsListEl.textContent = 'Failed to load friend details.';
-          return;
-        }
-
-        friendsListEl.innerHTML = ''; // Clear previous
-
-        friendProfiles.forEach(friend => {
-          const friendLink = document.createElement('a');
-          friendLink.href = `profile.html?user=${friend.user_id}`;
-          friendLink.style.display = 'flex';
-          friendLink.style.alignItems = 'center';
-          friendLink.style.gap = '8px';
-          friendLink.style.textDecoration = 'none';
-          friendLink.style.color = '#333';
-
-          const img = document.createElement('img');
-          img.src = friend.profile_picture_url || 'https://fctswjvfkyolhiyzhusb.supabase.co/storage/v1/object/public/profile-pictures/standardProfile.jpg';
-          img.alt = `${friend.display_name}'s profile picture`;
-          img.style.width = '40px';
-          img.style.height = '40px';
-          img.style.borderRadius = '50%';
-          img.style.objectFit = 'cover';
+  // Fetch friend relationships where userId is user_id or friend_id
+  const { data: friendsData, error: friendsError } = await supabase
+  .from('friends')
+  .select('user_id, friend_id')
+  .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
 
 
 
-          const usernameSpan = document.createElement('span');
-          usernameSpan.textContent = friend.display_name || 'Unnamed User';
 
-          friendLink.appendChild(img);
-          friendLink.appendChild(usernameSpan);
+    console.log('friendsData:', friendsData, 'friendsError:', friendsError);
+    
 
-          friendsListEl.appendChild(friendLink);
-        });
-      }
+  if (friendsError) {
+    console.error('Error fetching friends:', friendsError);
+    friendsListEl.textContent = 'Failed to load friends.';
+    return;
+  }
+
+  if (!friendsData || friendsData.length === 0) {
+  console.log('No friends found for user:', userId);
+  friendsListEl.textContent = 'No friends found.';
+  return;
+}
+  console.log('loadFriends() - friendsData:', friendsData, 'friendsError:', friendsError);
+
+  // Determine friend IDs (exclude self)
+  const friendIds = friendsData.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
+   console.log('loadFriends() - friendIds:', friendIds);
+
+  // Fetch friend profiles from 'users' table
+  const { data: friendProfiles, error: profilesError } = await supabase
+    .from('users')
+    .select('id, username, profile_picture_url, display_name')
+    .in('id', friendIds);
+
+  if (profilesError) {
+    console.error('Error fetching friend profiles:', profilesError);
+    friendsListEl.textContent = 'Failed to load friend details.';
+    return;
+  }
+  console.log('loadFriends() - friendProfiles:', friendProfiles);
+
+  friendsListEl.innerHTML = ''; // Clear previous
+
+  friendProfiles.forEach(friend => {
+    const friendLink = document.createElement('a');
+    friendLink.href = `profile.html?user=${friend.id}`;
+    friendLink.style.display = 'flex';
+    friendLink.style.alignItems = 'center';
+    friendLink.style.gap = '8px';
+    friendLink.style.textDecoration = 'none';
+    friendLink.style.color = '#333';
+
+    const img = document.createElement('img');
+    img.src = friend.profile_picture_url || 'https://fctswjvfkyolhiyzhusb.supabase.co/storage/v1/object/public/profile-pictures/standardProfile.jpg';
+    img.alt = `${friend.display_name || friend.username || 'User'}'s profile picture`;
+    img.style.width = '40px';
+    img.style.height = '40px';
+    img.style.borderRadius = '50%';
+    img.style.objectFit = 'cover';
+
+    const usernameSpan = document.createElement('span');
+    usernameSpan.textContent = friend.display_name || friend.username || 'Unnamed User';
+
+    friendLink.appendChild(img);
+    friendLink.appendChild(usernameSpan);
+
+    friendsListEl.appendChild(friendLink);
+  });
+}
+
 
       
 
@@ -205,6 +219,7 @@
 
       async function init() {
         const userId = localStorage.getItem('userId');
+        console.log('init() - userId:', userId);  // Log userId here
         if (!userId) {
           alert('No user ID found. Please log in.');
           window.location.href = 'login.html';
@@ -300,7 +315,9 @@ imageUrl = publicUrlData.publicUrl;
 
       
 
-      init();
+      document.addEventListener("DOMContentLoaded", () => {
+  init();
+});
     </script>
   </div>
 </body>

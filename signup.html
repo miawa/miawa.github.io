@@ -18,90 +18,129 @@
 
   <!-- Load supabase & bcrypt -->
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-    import bcrypt from 'https://cdn.skypack.dev/bcryptjs';
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-    const supabaseUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjdHN3anZma3lvbGhpeXpodXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NzgyNjIsImV4cCI6MjA2NTE1NDI2Mn0.s4YyGiWuWsB8bPJTz2zoZ2tUTz_95MiM5gogKTlD42w';
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabaseUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co';
+  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjdHN3anZma3lvbGhpeXpodXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NzgyNjIsImV4cCI6MjA2NTE1NDI2Mn0.s4YyGiWuWsB8bPJTz2zoZ2tUTz_95MiM5gogKTlD42w'; // Use your public anon key here
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
-    document.getElementById('signupForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
+  document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value.trim();
-      const messageEl = document.getElementById('message');
-      const defaultProfilePicUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co/storage/v1/object/public/profile-pictures/standardProfile.jpg';
-      const defaultEmail = 'noemail@domain.com';
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const messageEl = document.getElementById('message');
+    const defaultProfilePicUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co/storage/v1/object/public/profile-pictures/standardProfile.jpg';
+    const defaultEmail = 'noemail@domain.com'; // you can change this or add an email field
 
-      if (!username || !password) {
-        messageEl.textContent = 'Please fill in both fields.';
+    if (!username || !password) {
+      messageEl.textContent = 'Please fill in both fields.';
+      return;
+    }
+
+    messageEl.textContent = 'Signing up...';
+
+    try {
+      // 1. Sign up user with Supabase Auth
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: defaultEmail,
+        password,
+      });
+
+      try {
+    // Generate dummy email here
+    const dummyEmail = `user_${Date.now()}@example.com`;
+
+    // Then use dummyEmail for signup
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: dummyEmail,
+      password,
+      })
+    }catch (error){}; 
+
+
+      if (signUpError) {
+        messageEl.textContent = 'Signup failed: ' + signUpError.message;
+        return;
+      } else {
+
+        window.location.href = 'profilesetup.html';
+      }
+
+      // Note: If you use email confirmation, session might be null until verified.
+      // For demo, try signIn immediately to get session
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: defaultEmail,
+        password,
+      });
+
+      if (signInError) {
+        messageEl.textContent = 'Login failed: ' + signInError.message;
         return;
       }
 
-      messageEl.textContent = 'Signing up...';
+      const user = signInData.user;
 
-      try {
-        // Hash password with bcrypt
-        const salt = bcrypt.genSaltSync(10);
-        const password_hash = bcrypt.hashSync(password, salt);
-
-        // Insert user into users table
-        const { data: userDataArray, error: userError } = await supabase
-          .from('users')
-          .insert([{ username, email: defaultEmail, password_hash }])
-          .select();
-
-        if (userError || !userDataArray || userDataArray.length === 0) {
-          console.error('User insert error:', userError);
-          messageEl.textContent = 'Sign up failed: ' + (userError?.message || 'Unknown error');
-          return;
-        }
-
-        const userId = userDataArray[0].id;
-
-        // Insert profile row linked to user_id with default data
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([{
-            user_id: userId,
-            profile_picture_url: defaultProfilePicUrl,
-            display_name: username,
-            bio: null,
-            location: null
-          }]);
-
-        if (profileError) {
-          console.error('Profile creation failed:', profileError);
-          messageEl.textContent = 'Profile creation failed: ' + profileError.message;
-          return;
-        }
-
-        localStorage.setItem('userId', userId);
-
-        messageEl.textContent = 'Sign up successful! Redirecting to profile setup...';
-         // Automatically add friend relationship
-  try {
-   await supabase
-  .from('friends')
-  .insert([{ user_id: userId, friend_id: '9073b416-5bee-42d2-9fd8-3d27d6b45ac5' }]);
-
-
-    alert('Sign up successful! You are now friends with our special user.');
-  } catch (insertError) {
-    console.error('Failed to add friend on signup:', insertError);
-  }
-
-        // Redirect to profile setup page
-        setTimeout(() => {
-          window.location.href = 'profilesetup.html';
-        }, 1500);
-      } catch (err) {
-        messageEl.textContent = 'Error: ' + err.message;
+      if (!user) {
+        messageEl.textContent = 'Could not get user after login.';
+        return;
       }
 
+      // 2. Insert profile row (you must allow inserts by authenticated users via RLS)
+      // Insert profile row linked to user_id with default data
+const { data: profileData, error: profileError } = await supabase
+  .from('profiles')
+  .insert([{
+    user_id: user.id,
+    profile_picture_url: defaultProfilePicUrl,
+    display_name: username,
+    bio: null,
+    location: null
+  }])
+  .select();
 
-    });
-  </script>
+if (profileError) {
+  if (profileData && profileData.length > 0) {
+    // Insert succeeded despite error - ignore it and continue
+    console.warn('Ignoring false positive RLS error on profile insert:', profileError.message);
+  } else {
+    console.error('Profile creation failed:', profileError);
+    messageEl.textContent = 'Profile creation failed: ' + profileError.message;
+    return;
+  }
+}
+
+// Proceed to next step
+localStorage.setItem('userId', userId);
+messageEl.textContent = 'Sign up successful! Redirecting to profile setup...';
+
+// Redirect after short delay
+setTimeout(() => {
+  window.location.href = 'profilesetup.html';
+}, 1500);
+      // 3. Store userId or other needed info
+      localStorage.setItem('userId', user.id);
+
+      messageEl.textContent = 'Sign up successful! Redirecting to profile setup...';
+
+      // 4. Add default friend relationship (optional)
+      try {
+        await supabase.from('friends').insert([{ user_id: user.id, friend_id: '9073b416-5bee-42d2-9fd8-3d27d6b45ac5' }]);
+        alert('You are now friends with our special user.');
+      } catch (insertError) {
+        console.error('Failed to add friend on signup:', insertError);
+      }
+
+      setTimeout(() => {
+        window.location.href = 'profilesetup.html';
+      }, 1500);
+
+    } catch (err) {
+      messageEl.textContent = 'Error: ' + err.message;
+    }
+  });
+</script>
+
 </body>
 </html>
