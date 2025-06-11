@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign Up</title>
+  <link rel="stylesheet" href="login.css" />
+</head>
+<body>
+  <h1>Sign Up</h1>
+
+  <form id="signupForm">
+    <label>Username: <input type="text" id="username" required /></label><br><br>
+    <label>Password: <input type="password" id="password" required /></label><br><br>
+    <button type="submit">Sign Up</button>
+  </form>
+
+  <div id="message"></div>
+
+  <!-- Load supabase & bcrypt -->
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import bcrypt from 'https://cdn.skypack.dev/bcryptjs';
+
+    const supabaseUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjdHN3anZma3lvbGhpeXpodXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NzgyNjIsImV4cCI6MjA2NTE1NDI2Mn0.s4YyGiWuWsB8bPJTz2zoZ2tUTz_95MiM5gogKTlD42w';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const messageEl = document.getElementById('message');
+      const defaultProfilePicUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co/storage/v1/object/public/profile-pictures/standardProfile.jpg';
+      const defaultEmail = 'noemail@domain.com';
+
+      if (!username || !password) {
+        messageEl.textContent = 'Please fill in both fields.';
+        return;
+      }
+
+      messageEl.textContent = 'Signing up...';
+
+      try {
+        // Hash password with bcrypt
+        const salt = bcrypt.genSaltSync(10);
+        const password_hash = bcrypt.hashSync(password, salt);
+
+        // Insert user into users table
+        const { data: userDataArray, error: userError } = await supabase
+          .from('users')
+          .insert([{ username, email: defaultEmail, password_hash }])
+          .select();
+
+        if (userError || !userDataArray || userDataArray.length === 0) {
+          console.error('User insert error:', userError);
+          messageEl.textContent = 'Sign up failed: ' + (userError?.message || 'Unknown error');
+          return;
+        }
+
+        const userId = userDataArray[0].id;
+
+        // Insert profile row linked to user_id with default data
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{
+            user_id: userId,
+            profile_picture_url: defaultProfilePicUrl,
+            display_name: username,
+            bio: null,
+            location: null
+          }]);
+
+        if (profileError) {
+          console.error('Profile creation failed:', profileError);
+          messageEl.textContent = 'Profile creation failed: ' + profileError.message;
+          return;
+        }
+
+        localStorage.setItem('userId', userId);
+
+        messageEl.textContent = 'Sign up successful! Redirecting to profile setup...';
+         // Automatically add friend relationship
+  try {
+   await supabase
+  .from('friends')
+  .insert([{ user_id: userId, friend_id: '9073b416-5bee-42d2-9fd8-3d27d6b45ac5' }]);
+
+
+    alert('Sign up successful! You are now friends with our special user.');
+  } catch (insertError) {
+    console.error('Failed to add friend on signup:', insertError);
+  }
+
+        // Redirect to profile setup page
+        setTimeout(() => {
+          window.location.href = 'profilesetup.html';
+        }, 1500);
+      } catch (err) {
+        messageEl.textContent = 'Error: ' + err.message;
+      }
+
+
+    });
+  </script>
+</body>
+</html>

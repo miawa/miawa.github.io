@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login</title>
+  <link rel="stylesheet" href="login.css" />
+</head>
+<body>
+  <h1>Login</h1>
+
+  <form id="loginForm">
+      <input type="text" id="username" placeholder="Username" required />
+      <input type="password" id="password" placeholder="Password" required />
+      <button type="submit">Login</button>
+    </form>
+
+  <div id="message"></div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import bcrypt from 'https://cdn.skypack.dev/bcryptjs';
+
+    const supabaseUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjdHN3anZma3lvbGhpeXpodXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NzgyNjIsImV4cCI6MjA2NTE1NDI2Mn0.s4YyGiWuWsB8bPJTz2zoZ2tUTz_95MiM5gogKTlD42w'; // Replace with your anon key
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const messageEl = document.getElementById('message');
+
+      if (!username || !password) {
+        messageEl.textContent = 'Please fill in both fields.';
+        return;
+      }
+
+      messageEl.textContent = 'Logging in...';
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', username)
+          .single();
+
+        if (error || !data) {
+          messageEl.textContent = 'User not found.';
+          return;
+        }
+
+        const isValid = bcrypt.compareSync(password, data.password_hash);
+        if (!isValid) {
+          messageEl.textContent = 'Invalid password.';
+          return;
+        }
+
+        // Store user ID in localStorage for profile page
+        localStorage.setItem('userId', data.id);
+
+        messageEl.textContent = 'Login successful! Redirecting...';
+        window.location.href = 'mainpage.html';
+
+      } catch (err) {
+        messageEl.textContent = 'Error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>

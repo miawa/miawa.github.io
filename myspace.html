@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>My Space</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script type="module" src="myspace.js" defer></script>
+  <link rel="stylesheet" href="myspacestylesheet.css" />
+</head>
+
+<body>
+  <div id="container">
+    <main>
+      <img id="profilePicture" src="default.jpg" alt="Profile Picture" />
+      <p id="usernameDisplay"></p> 
+      <p id="displayName"></p>
+<p id="bio"></p>
+      <br />
+      <button type="button" id="changeButton">Change Profile Picture</button>
+      <button type="button" id="changeBackgroundButton">Change Background Image</button>
+<input type="file" id="backgroundFileInput" accept="image/*" hidden />
+
+      <input type="file" id="fileInput" accept="image/*" hidden />
+      <section id="friendsSection">
+    <h2>Friends</h2>
+    <div id="friendsList" style="display: flex; gap: 15px; flex-wrap: wrap;"></div>
+    <div id="postsContainer" style="margin-top: 20px;"></div>
+    <button class="fab" id="fab">+</button>
+
+
+<div class="fab-options" id="fabOptions">
+  <button class="fab-option-btn" id="newTextPostBtn">📄 Text Post</button>
+  <button class="fab-option-btn" id="newImagePostBtn">🖼️ Content Post</button>
+</div>
+
+<!-- Post Form -->
+<div id="postForm">
+  <textarea id="postText" placeholder="What's on your mind?"></textarea>
+  <input type="file" id="postImageInput" accept="image/*" style="display: none;" />
+  <div style="display: flex; gap: 10px;">
+    <button id="submitPostBtn">Post</button>
+    <button id="cancelPostBtn">Cancel</button>
+  </div>
+</div>
+
+    
+  </section>
+  
+  <ul id="friendsList"></ul>
+</section>
+    </main>
+
+    <footer>
+      <!-- Footer content -->
+    </footer>
+
+    <script type="module">
+      import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+      const supabaseUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co';
+      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjdHN3anZma3lvbGhpeXpodXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NzgyNjIsImV4cCI6MjA2NTE1NDI2Mn0.s4YyGiWuWsB8bPJTz2zoZ2tUTz_95MiM5gogKTlD42w'; // Replace with your anon key
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+
+      async function fetchUserProfile(userId) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user:', error);
+          return null;
+        }
+
+        // Update profile picture on page if available
+        if (data.profile_picture_url) {
+          document.getElementById('profilePicture').src = data.profile_picture_url;
+        }
+        if (data.username) {
+  document.getElementById('usernameDisplay').textContent = `${data.username}`;
+}
+        return data;
+      }
+      const friendsListEl = document.getElementById("friendsList");
+
+  async function loadFriends(userId) {
+        const friendsListEl = document.getElementById("friendsList");
+
+        // Fetch friend relationships where userId is user_id or friend_id
+        const { data: friendsData, error: friendsError } = await supabase
+          .from('friends')
+          .select('user_id, friend_id')
+          .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+
+        if (friendsError) {
+          console.error('Error fetching friends:', friendsError);
+          friendsListEl.textContent = 'Failed to load friends.';
+          return;
+        }
+
+        if (!friendsData || friendsData.length === 0) {
+          friendsListEl.textContent = 'No friends found.';
+          return;
+        }
+
+        // Determine friend IDs (exclude self)
+        const friendIds = friendsData.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
+
+        // Fetch friend profiles
+        const { data: friendProfiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, profile_picture_url, display_name')
+          .in('user_id', friendIds);
+
+        if (profilesError) {
+          console.error('Error fetching friend profiles:', profilesError);
+          friendsListEl.textContent = 'Failed to load friend details.';
+          return;
+        }
+
+        friendsListEl.innerHTML = ''; // Clear previous
+
+        friendProfiles.forEach(friend => {
+          const friendLink = document.createElement('a');
+          friendLink.href = `profile.html?user=${friend.user_id}`;
+          friendLink.style.display = 'flex';
+          friendLink.style.alignItems = 'center';
+          friendLink.style.gap = '8px';
+          friendLink.style.textDecoration = 'none';
+          friendLink.style.color = '#333';
+
+          const img = document.createElement('img');
+          img.src = friend.profile_picture_url || 'https://fctswjvfkyolhiyzhusb.supabase.co/storage/v1/object/public/profile-pictures/standardProfile.jpg';
+          img.alt = `${friend.display_name}'s profile picture`;
+          img.style.width = '40px';
+          img.style.height = '40px';
+          img.style.borderRadius = '50%';
+          img.style.objectFit = 'cover';
+
+
+
+          const usernameSpan = document.createElement('span');
+          usernameSpan.textContent = friend.display_name || 'Unnamed User';
+
+          friendLink.appendChild(img);
+          friendLink.appendChild(usernameSpan);
+
+          friendsListEl.appendChild(friendLink);
+        });
+      }
+
+      
+
+        async function loadPosts(userId) {
+        const postsContainer = document.getElementById('postsContainer');
+        if (!postsContainer) return;
+
+        postsContainer.innerHTML = '';
+
+        const { data: posts, error } = await supabase
+          .from('posts')
+          .select('id, body, media_url, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching posts:', error);
+          postsContainer.textContent = 'Failed to load posts.';
+          return;
+        }
+
+        if (!posts || posts.length === 0) {
+          postsContainer.textContent = 'No posts yet.';
+          return;
+        }
+
+        posts.forEach(post => {
+          const postEl = document.createElement('div');
+          postEl.classList.add('post');
+
+          const contentEl = document.createElement('p');
+          contentEl.textContent = post.body;
+
+          postEl.appendChild(contentEl);
+
+          if (post.media_url) {
+            const imgEl = document.createElement('img');
+            imgEl.src = post.media_url;
+            imgEl.alt = 'Post image';
+            imgEl.style.maxWidth = '100%';
+            imgEl.style.marginTop = '8px';
+            postEl.appendChild(imgEl);
+          }
+
+          const dateEl = document.createElement('small');
+          dateEl.textContent = new Date(post.created_at).toLocaleString();
+          postEl.appendChild(dateEl);
+
+          postsContainer.appendChild(postEl);
+        });
+      }
+
+      async function init() {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          alert('No user ID found. Please log in.');
+          window.location.href = 'login.html';
+          return;
+        }
+        const fab = document.getElementById('fab');
+  const fabOptions = document.getElementById('fabOptions');
+  const postForm = document.getElementById('postForm');
+  const postText = document.getElementById('postText');
+  const postImageInput = document.getElementById('postImageInput');
+  let selectedImageFile = null;
+
+  fab.onclick = () => {
+    fabOptions.style.display = fabOptions.style.display === 'flex' ? 'none' : 'flex';
+  };
+
+  document.getElementById('newTextPostBtn').onclick = () => {
+    selectedImageFile = null;
+    postImageInput.style.display = 'none';
+    postForm.style.display = 'block';
+    fabOptions.style.display = 'none';
+  };
+
+  document.getElementById('newImagePostBtn').onclick = () => {
+    postImageInput.style.display = 'block';
+    postImageInput.click();
+    postImageInput.onchange = () => {
+      selectedImageFile = postImageInput.files[0];
+      postForm.style.display = 'block';
+      fabOptions.style.display = 'none';
+    };
+  };
+
+  document.getElementById('cancelPostBtn').onclick = () => {
+    postForm.style.display = 'none';
+    postText.value = '';
+    postImageInput.value = '';
+    selectedImageFile = null;
+  };
+
+  document.getElementById('submitPostBtn').onclick = async () => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('No user ID found. Please log in.');
+      return;
+    }
+
+    let imageUrl = null;
+
+    // Upload image if selected
+    if (selectedImageFile) {
+  const fileExt = selectedImageFile.name.split('.').pop();
+const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+const { data, error } = await supabase.storage
+  .from('post-images')
+  .upload(fileName, selectedImageFile, { upsert: true });
+
+if (error) {
+  alert('Image upload failed.');
+  console.error(error);
+  return;
+}
+
+const { data: publicUrlData } = supabase.storage.from('post-images').getPublicUrl(fileName);
+imageUrl = publicUrlData.publicUrl;
+}
+
+    const { error: insertError } = await supabase.from('posts').insert([{
+      user_id: userId,
+      body: postText.value.trim(),
+      media_url: imageUrl || null
+    }]);
+
+    if (insertError) {
+      alert('Failed to create post.');
+      console.error(insertError);
+      return;
+    }
+
+    postForm.style.display = 'none';
+    postText.value = '';
+    postImageInput.value = '';
+    selectedImageFile = null;
+
+    await loadPosts(userId); // refresh posts
+  };
+
+        await fetchUserProfile(userId);
+        await loadFriends(userId);
+        await loadPosts(userId); // ✅ CALLING loadPosts() here
+      }
+
+      
+
+      init();
+    </script>
+  </div>
+</body>
+
+</html>
