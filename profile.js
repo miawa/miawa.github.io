@@ -4,11 +4,308 @@ const supabaseUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjdHN3anZma3lvbGhpeXpodXNiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0OTU3ODI2MiwiZXhwIjoyMDY1MTU0MjYyfQ.CAsDZEtYPa9e1hKmufSsofDkAXC1AFLeEk2bN50Gad0';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const originalFetch = window.fetch;
+window.fetch = function (...args) {
+  console.log('FETCH CALLED:', ...args);
+  return originalFetch.apply(this, args);
+};
+
 // Get user ID from URL or fallback to localStorage
 function getUserIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get('user');
 }
+
+async function getUsernamesForComments(comments) {
+  const userIds = [...new Set(comments.map(c => c.user_id))]; // unique IDs
+
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('id, username')
+    .in('id', userIds);
+
+  if (error) {
+    console.error('Error fetching usernames:', error);
+    return {};
+  }
+
+  // Map user_id => username for quick lookup
+  const userMap = {};
+  users.forEach(user => {
+    userMap[user.id] = user.username;
+  });
+
+  return userMap;
+}
+
+
+
+async function loadPosts(userId) {
+  if (!userId) return;
+
+  const postsListEl = document.getElementById('postsList');
+  postsListEl.innerHTML = 'Loading posts...';
+
+  const { data: posts, error } = await supabase
+    .from('posts')
+    .select('id, body, media_url, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching posts:', error);
+    postsListEl.textContent = 'Failed to load posts.';
+    return;
+  }
+
+  if (!posts || posts.length === 0) {
+    postsListEl.textContent = 'No posts found.';
+    return;
+  }
+
+  postsListEl.innerHTML = ''; // clear loading text
+
+ for (const post of posts) {
+      const postEl = document.createElement('div');
+      postEl.classList.add('post');
+
+      // Post body
+      const contentEl = document.createElement('p');
+      contentEl.textContent = post.body;
+      postEl.appendChild(contentEl);
+
+      // Post image if exists
+      if (post.media_url) {
+        const imgEl = document.createElement('img');
+        imgEl.src = post.media_url;
+        imgEl.alt = 'Post image';
+        imgEl.style.maxWidth = '100%';
+        imgEl.style.marginTop = '8px';
+        postEl.appendChild(imgEl);
+      }
+
+      // Post timestamp
+      const dateEl = document.createElement('small');
+      dateEl.textContent = new Date(post.created_at).toLocaleString();
+      postEl.appendChild(dateEl);
+
+        
+
+
+      // Likes
+      const likesCount = await getLikesCount(post.id);
+  let likedByUser = await hasUserLiked(post.id);
+
+  const likeBtn = document.createElement('button');
+  likeBtn.textContent = likedByUser ? `❤️ ${likesCount}` : `🤍 ${likesCount}`;
+  likeBtn.style.marginTop = '8px';
+  likeBtn.onclick = async () => {
+    if (likedByUser) {
+      await unlikePost(post.id);
+      likedByUser = false;
+    } else {
+      await likePost(post.id);
+      likedByUser = true;
+    }
+    const newLikesCount = await getLikesCount(post.id);
+    likeBtn.textContent = likedByUser ? `❤️ ${newLikesCount}` : `🤍 ${newLikesCount}`;
+  };
+  postEl.appendChild(likeBtn);
+
+  // Comments section
+  const comments = await getComments(post.id);
+  const userMap = await getUsernamesForComments(comments);
+  const commentsList = document.createElement('div');
+  commentsList.style.marginTop = '8px';
+  commentsList.style.borderTop = '1px solid #ccc';
+  commentsList.style.paddingTop = '6px';
+
+  
+
+  comments.forEach(comment => {
+    const commentEl = document.createElement('div');
+    commentEl.style.fontSize = '0.9em';
+    commentEl.style.marginBottom = '4px';
+const userLink = document.createElement('a');
+  userLink.href = `profile.html?user=${comment.user_id}`;
+  userLink.textContent = userMap[comment.user_id] || comment.user_id;
+  userLink.style.fontWeight = 'bold';
+  userLink.style.marginRight = '4px';
+  userLink.style.textDecoration = 'none';
+  userLink.style.color = '#0077cc';
+
+  const textSpan = document.createElement('span');
+  textSpan.textContent = `: ${comment.text}`;
+
+  commentEl.appendChild(userLink);
+  commentEl.appendChild(textSpan);
+
+    commentsList.appendChild(commentEl);
+
+    
+    
+    
+  });
+  
+  postEl.appendChild(commentsList);
+  postsListEl.appendChild(postEl); // <--- Probably missing
+
+
+// Add comment input
+  const commentInput = document.createElement('input');
+  commentInput.type = 'text';
+  commentInput.placeholder = 'Add a comment...';
+  commentInput.style.width = '80%';
+  commentInput.style.marginTop = '6px';
+
+  const commentBtn = document.createElement('button');
+  commentBtn.textContent = 'Comment';
+  commentBtn.style.marginLeft = '4px';
+
+  commentBtn.onclick = async () => {
+    if (commentInput.value.trim() !== '') {
+      await addComment(post.id, commentInput.value.trim());
+      commentInput.value = '';
+
+      // Reload comments after adding new one
+      const updatedComments = await getComments(post.id);
+      commentsList.innerHTML = '';
+      updatedComments.forEach(async (c) => {
+  const commentEl = document.createElement('div');
+  commentEl.style.fontSize = '0.9em';
+  commentEl.style.marginBottom = '4px';
+
+  const userLink = document.createElement('a');
+  userLink.href = `profile.html?user=${c.user_id}`;
+  userLink.textContent = c.user_id; // fallback before fetching username
+  userLink.style.fontWeight = 'bold';
+  userLink.style.marginRight = '4px';
+  userLink.style.textDecoration = 'none';
+  userLink.style.color = '#0077cc';
+
+  // Fetch username
+  const { data, error } = await supabase
+    .from('users')
+    .select('username')
+    .eq('id', c.user_id)
+    .single();
+
+  if (!error && data?.username) {
+    userLink.textContent = data.username;
+  }
+
+  const textSpan = document.createElement('span');
+  textSpan.textContent = `: ${c.text}`;
+
+  commentEl.appendChild(userLink);
+  commentEl.appendChild(textSpan);
+
+  commentsList.appendChild(commentEl);
+});
+    }
+  };
+
+  const commentForm = document.createElement('div');
+  commentForm.style.display = 'flex';
+  commentForm.style.alignItems = 'center';
+  commentForm.style.marginTop = '4px';
+
+  commentForm.appendChild(commentInput);
+  commentForm.appendChild(commentBtn);
+
+  postEl.appendChild(commentForm);
+
+postsListEl.appendChild(postEl);
+  postsListEl.appendChild(postEl);
+    }
+
+
+} 
+
+
+
+  
+
+
+
+
+
+ async function getLikesCount(postId) {
+      const { data, error } = await supabase
+      .from('post_likes')
+      .select('*', { count: 'exact' })
+      .eq('post_id', postId);
+
+    if (error) {
+      console.error('Error fetching likes count:', error);
+      return 0;
+    }
+    return data.length;
+  }
+
+  async function hasUserLiked(postId) {
+    const userId = localStorage.getItem('userId');
+    console.log('hasUserLiked called with postId:', postId, 'userId:', userId); // <--- here, before the Supabase call
+    const { data, error } = await supabase
+      .from('post_likes')
+      .select('*')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+      if (error) {
+  console.error('Error checking user like:', error);
+  return false;
+}
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error checking user like:', error);
+      return false;
+    }
+    return !!data;
+  }
+
+  async function likePost(postId) {
+     console.log('getLikesCount called with postId:', postId);  // <--- log here
+    const userId = localStorage.getItem('userId');
+    const { error } = await supabase.from('post_likes').insert([{ post_id: postId, user_id: userId }]);
+    if (error) console.error('Error liking post:', error);
+  }
+
+  async function unlikePost(postId) {
+    const userId = localStorage.getItem('userId');
+    const { data, error } = await supabase
+      .from('post_likes')
+      .delete()
+      .eq('post_id', postId)
+      .eq('user_id', userId);
+    if (error) console.error('Error unliking post:', error);
+  }
+
+  async function getComments(postId) {
+    const { data, error } = await supabase
+      .from('post_comments')
+      .select('id, user_id, text, created_at')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching comments:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+   async function addComment(postId, commentText) {
+    const userId = localStorage.getItem('userId');
+    const { error } = await supabase.from('post_comments').insert([{
+      post_id: postId,
+      user_id: userId,
+      text: commentText
+    }]);
+    if (error) console.error('Error adding comment:', error);
+  }
+
 
 // Fetch user profile from profiles and users table
 async function fetchUserProfile(userId) {
@@ -82,9 +379,13 @@ async function fetchUserProfile(userId) {
 
 // Load friends for the profile user
 async function loadFriends(userId) {
+
   if (!userId) return;
 
   const friendsListEl = document.getElementById('friendsList');
+
+  // For the logged-in user id, you can get it from localStorage or pass it as a parameter
+  const loggedInUserId = localStorage.getItem('userId');
 
   // Fetch friends where user is user_id or friend_id
   const { data: friendsData, error } = await supabase
@@ -122,7 +423,13 @@ async function loadFriends(userId) {
 
   friendProfiles.forEach(friend => {
     const friendLink = document.createElement('a');
-    friendLink.href = `profile.html?user=${friend.user_id}`;
+
+    if (friend.user_id === loggedInUserId) {
+      friendLink.href = 'myspace.html';
+    } else {
+      friendLink.href = `profile.html?user=${friend.user_id}`;
+    }
+
     friendLink.style.display = 'flex';
     friendLink.style.alignItems = 'center';
     friendLink.style.gap = '8px';
@@ -149,6 +456,9 @@ async function loadFriends(userId) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   const userId = getUserIdFromUrl() || localStorage.getItem('userId');
+   console.log('DOM fully loaded and parsed');
+  const friendsListEl = document.getElementById('friendsList');
+  console.log('friendsListEl:', friendsListEl);
   if (!userId) {
     alert('No user ID found. Please log in.');
     window.location.href = 'login.html';
@@ -157,4 +467,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await fetchUserProfile(userId);
   await loadFriends(userId);
+  await loadPosts(userId);  // <-- add this call here
 });
+
+

@@ -6,13 +6,29 @@
   <link rel="stylesheet" href="login.css" />
 </head>
 <body>
-  <h1>Login</h1>
+  <div class="login-container">
+    <h1>Login</h1>
 
-  <form id="loginForm">
-      <input type="text" id="username" placeholder="Username" required />
-      <input type="password" id="password" placeholder="Password" required />
+    <form id="loginForm">
+      <label for="username">Username:</label>
+      <input type="text" id="username" placeholder="Enter your username" required />
+
+      <label for="password">Password:</label>
+      <input type="password" id="password" placeholder="Enter your password" required />
+
+      <div id="message"></div>
+
       <button type="submit">Login</button>
     </form>
+
+    <p class="signup-text">Not a member? <a href="signup.html">Sign up</a></p>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2025 MiaSpace. All rights reserved.</p>
+    <p><a href="contact.html">Contact Us</a></p>
+  </footer>
 
   <div id="message"></div>
 
