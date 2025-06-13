@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Social Media App</title>
+  <link rel="stylesheet" href="mainbodystylesheet.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Left Sidebar -->
+    <nav class="sidebar-left">
+      <h2>Menu</h2>
+      <a href="myspace.html">Profile</a>
+      <a href="#">Messages</a>
+      <a href="#">Settings</a>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <h1>Welcome to Your Feed</h1>
+      <p>This is where your main content will go.</p>
+    </main>
+
+    <!-- Right Sidebar -->
+    <aside class="sidebar-right">
+      <h3>Friends</h3>
+      <div id="friendsList">
+        <!-- Friends will load here -->
+      </div>
+    </aside>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const supabaseUrl = 'https://fctswjvfkyolhiyzhusb.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjdHN3anZma3lvbGhpeXpodXNiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0OTU3ODI2MiwiZXhwIjoyMDY1MTU0MjYyfQ.CAsDZEtYPa9e1hKmufSsofDkAXC1AFLeEk2bN50Gad0';  // Replace with your anon key
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    async function loadFriends() {
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        alert('No user logged in. Redirecting to login.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      // Fetch friend relationships
+      const { data: friendsData, error: friendsError } = await supabase
+        .from('friends')
+        .select('user_id, friend_id')
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+
+      if (friendsError) {
+        console.error('Error loading friends:', friendsError);
+        document.getElementById('friendsList').textContent = 'Failed to load friends.';
+        return;
+      }
+
+      if (!friendsData || friendsData.length === 0) {
+        document.getElementById('friendsList').textContent = 'No friends found.';
+        return;
+      }
+
+      // Get friend IDs (excluding current user)
+      const friendIds = friendsData.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
+
+      // Fetch friend profiles
+      const { data: friendProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, profile_picture_url')
+        .in('user_id', friendIds);
+
+      if (profilesError) {
+        console.error('Error loading friend profiles:', profilesError);
+        document.getElementById('friendsList').textContent = 'Failed to load friend details.';
+        return;
+      }
+
+      const friendsListEl = document.getElementById('friendsList');
+      friendsListEl.innerHTML = ''; // Clear existing
+
+      friendProfiles.forEach(friend => {
+        const friendDiv = document.createElement('div');
+        friendDiv.classList.add('friend');
+        friendDiv.style.cursor = 'pointer';
+        friendDiv.style.display = 'flex';
+        friendDiv.style.alignItems = 'center';
+        friendDiv.style.gap = '8px';
+
+        const img = document.createElement('img');
+        img.src = friend.profile_picture_url || 'https://fctswjvfkyolhiyzhusb.supabase.co/storage/v1/object/public/profile-pictures/standardProfile.jpg';
+        img.alt = friend.display_name || 'Friend';
+        img.style.width = '32px';
+        img.style.height = '32px';
+        img.style.borderRadius = '50%';
+        img.style.objectFit = 'cover';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = friend.display_name || 'Unnamed User';
+
+        friendDiv.appendChild(img);
+        friendDiv.appendChild(nameSpan);
+
+        // Navigate to friend profile on click
+        friendDiv.addEventListener('click', () => {
+          window.location.href = `profile.html?user=${friend.user_id}`;
+        });
+
+        friendsListEl.appendChild(friendDiv);
+      });
+    }
+
+    if (profile.background_image_url) {
+  document.body.style.backgroundImage = `url(${profile.background_image_url})`;
+  document.body.style.backgroundSize = 'cover';
+  document.body.style.backgroundPosition = 'center';
+  document.body.style.backgroundRepeat = 'no-repeat';
+}
+
+backgroundFileInput.addEventListener('change', async () => {
+  const file = backgroundFileInput.files[0];
+  if (!file) return;
+  if (!confirm("Are you sure you want to change your background image?")) {
+    backgroundFileInput.value = "";
+    return;
+  }
+
+  const imageUrl = URL.createObjectURL(file);
+
+  // Set body background
+  document.body.style.backgroundImage = `url(${imageUrl})`;
+  document.body.style.backgroundSize = 'cover';
+  document.body.style.backgroundPosition = 'center';
+  document.body.style.backgroundRepeat = 'no-repeat';
+
+ 
+});
+
+
+
+    // Load friends when page loads
+    loadFriends();
+  </script>
+</body>
+</html>
