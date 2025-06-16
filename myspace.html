@@ -407,10 +407,16 @@ async function playProfileMusic(userId) {
 
     document.body.appendChild(audio);
 
-    // Try to play (some browsers require interaction first)
-    audio.play().catch(err => {
-      console.warn('Autoplay prevented:', err);
-    });
+    function playAudioOnInteraction() {
+      audio.play().catch(err => {
+        console.warn('Audio play failed:', err);
+      });
+      document.removeEventListener('click', playAudioOnInteraction);
+    }
+
+    document.addEventListener('click', playAudioOnInteraction);
+
+    
 
   } catch (err) {
     console.error('Error playing profile music:', err);
@@ -421,7 +427,7 @@ async function playProfileMusic(userId) {
 document.addEventListener('DOMContentLoaded', () => {
   const userId = localStorage.getItem('userId');
   if (userId) {
-  //  playProfileMusic(userId);
+    playProfileMusic(userId);
   }
 });
 
@@ -595,7 +601,7 @@ console.log('Cropped image file created:', selectedImageFile);
     }
 
     console.log('fetchUserProfile() - profile data:', data);
-    playProfileMusic(userId);
+   // playProfileMusic(userId);
 
     // Update profile picture if available
     if (data.profile_picture_url) {
