@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login</title>
+  <link rel="stylesheet" href="login.css" />
+</head>
+<body>
+  <div class="login-container">
+    <h1>Login</h1>
+
+    <form id="loginForm">
+      <label for="username">Username:</label>
+      <input type="text" id="username" placeholder="Enter your username" required />
+
+      <label for="password">Password:</label>
+      <input type="password" id="password" placeholder="Enter your password" required />
+
+      <div id="message"></div>
+
+      <button type="submit">Login</button>
+    </form>
+
+    <p class="signup-text">Not a member? <a href="signup.html">Sign up</a></p>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2025 MiaSpace. All rights reserved.</p>
+    <p><a href="contact.html">Contact Us</a></p>
+  </footer>
+
+  <div id="message"></div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import bcrypt from 'https://cdn.skypack.dev/bcryptjs';
+
+   import supabase from './supabaseClient.js';
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const messageEl = document.getElementById('message');
+
+      if (!username || !password) {
+        messageEl.textContent = 'Please fill in both fields.';
+        return;
+      }
+
+      messageEl.textContent = 'Logging in...';
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', username)
+          .single();
+
+        if (error || !data) {
+          messageEl.textContent = 'User not found.';
+          return;
+        }
+
+        const isValid = bcrypt.compareSync(password, data.password_hash);
+        if (!isValid) {
+          messageEl.textContent = 'Invalid password.';
+          return;
+        }
+
+        // Store user ID in localStorage for profile page
+        localStorage.setItem('userId', data.id);
+
+        messageEl.textContent = 'Login successful! Redirecting...';
+        window.location.href = 'mainpage.html';
+
+      } catch (err) {
+        messageEl.textContent = 'Error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
